@@ -1,0 +1,53 @@
+name: annual-report
+
+on:
+  workflow_dispatch:
+    inputs:
+      excel_file:
+        description: Path to Excel file with annual report links
+        required: true
+      code:
+        description: Stock code, for example 600519
+        required: true
+      year:
+        description: Report year, for example 2023
+        required: true
+      keep_pdf:
+        description: Keep PDF in artifact
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Fetch and convert annual report
+        run: |
+          keep_pdf_flag=""
+          if [ "${{ inputs.keep_pdf }}" = "true" ]; then
+            keep_pdf_flag="--keep-pdf"
+          fi
+          python "2.pdf_batch_converter.py" \
+            --excel-file "${{ inputs.excel_file }}" \
+            --code "${{ inputs.code }}" \
+            --year "${{ inputs.year }}" \
+            --out out \
+            $keep_pdf_flag
+      - name: Upload TXT artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: annual-report-${{ inputs.code }}-${{ inputs.year }}
+          path: out/
