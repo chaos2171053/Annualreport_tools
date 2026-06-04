@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 import random
@@ -64,6 +65,7 @@ class ConverterConfig:
     timeout: int = 15  # 请求超时时间（秒）
     chunk_size: int = 8192  # 下载块大小
     processes: Optional[int] = None  # 进程数，None表示自动
+    target_code: Optional[str] = None  # 只处理指定股票代码，None表示处理全年全部记录
 
 
 class PDFDownloader:
@@ -396,7 +398,7 @@ class AnnualReportProcessor:
             return False
 
     def _filter_data_by_year(self, df: pd.DataFrame) -> pd.DataFrame:
-        """按年份过滤数据。"""
+        """按年份和可选股票代码过滤数据。"""
         required_columns = ['公司代码', '公司简称', '年份', '年报链接']
 
         # 检查必需列
@@ -405,12 +407,17 @@ class AnnualReportProcessor:
             logging.error(f"Excel缺少必需列: {missing_cols}")
             return pd.DataFrame()
 
-        # 过滤年份
         filtered = df[df['年份'].astype(str) == str(self.config.target_year)]
-        logging.info(f"找到 {len(filtered)} 条 {self.config.target_year} 年的记录")
+        if self.config.target_code:
+            target_code = str(self.config.target_code).zfill(6)
+            codes = df['公司代码'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(6)
+            filtered = filtered[codes.loc[filtered.index] == target_code]
+            logging.info(f"找到 {len(filtered)} 条 {self.config.target_year} 年 {target_code} 的记录")
+        else:
+            logging.info(f"找到 {len(filtered)} 条 {self.config.target_year} 年的记录")
         return filtered
 
-    def run(self) -> None:
+    def run(self) -> bool:
         """执行批量处理流程。"""
         logging.info("="*60)
         logging.info("年报批量下载转换程序启动")
@@ -421,17 +428,17 @@ class AnnualReportProcessor:
         # 加载数据
         df = self._load_excel_data()
         if df is None:
-            return
+            return False
 
         # 准备目录
         if not self._prepare_directories():
-            return
+            return False
 
         # 过滤数据
         filtered_df = self._filter_data_by_year(df)
         if filtered_df.empty:
             logging.warning(f"未找到 {self.config.target_year} 年的数据")
-            return
+            return False
 
         # 准备任务列表
         tasks = [
@@ -452,66 +459,34 @@ class AnnualReportProcessor:
         logging.info("="*60)
         logging.info(f"处理完成: 成功 {success_count}/{len(tasks)}")
         logging.info("="*60)
+        return success_count == len(tasks)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Download one annual report from an existing link Excel and convert it to TXT.")
+    parser.add_argument("--excel-file", required=True, help="Excel file with columns: 公司代码, 公司简称, 年份, 年报链接")
+    parser.add_argument("--code", required=True, help="Stock code, for example 600519")
+    parser.add_argument("--year", required=True, type=int, help="Report year, for example 2023")
+    parser.add_argument("--out", default="out", help="Output root directory")
+    parser.add_argument("--keep-pdf", action="store_true", help="Keep downloaded PDF next to output TXT")
+    parser.add_argument("--timeout", type=int, default=15, help="Download timeout seconds")
+    parser.add_argument("--max-retries", type=int, default=3, help="Download retry count")
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
-    # ==================== 配置区域 ====================
-
-    # Excel表格路径（建议使用绝对路径）
-    # 2024年02月14日更新后，此处只需要填写总表的路径，请于网盘或github中获取总表
-    EXCEL_FILE = "/Users/lingxiaotian/development/personal/PythonProjects/年报链接_2024【公众号：凌小添】.xlsx"
-    # 是否删除转换后的PDF文件（节省磁盘空间）
-    DELETE_PDF = False
-
-    # 是否批量处理多个年份
-    BATCH_MODE = True
-
-    # 批量模式：年份区间（包含起始和结束年份）
-    START_YEAR = 2022
-    END_YEAR = 2024
-
-    # 单独模式：指定年份
-    SINGLE_YEAR = 2023
-
-    # 下载配置
-    MAX_RETRIES = 3  # 最大重试次数
-    TIMEOUT = 15  # 请求超时（秒）
-    PROCESSES = None  # 进程数（None表示自动）
-
-    # ==================== 执行逻辑 ====================
-
-    if BATCH_MODE:
-        # 批量处理多个年份
-        for year in range(START_YEAR, END_YEAR + 1):
-            config = ConverterConfig(
-                excel_file=EXCEL_FILE,
-                pdf_dir=f'年报文件/{year}/pdf年报',
-                txt_dir=f'年报文件/{year}/txt年报',
-                target_year=year,
-                delete_pdf=DELETE_PDF,
-                max_retries=MAX_RETRIES,
-                timeout=TIMEOUT,
-                processes=PROCESSES
-            )
-
-            processor = AnnualReportProcessor(config)
-            processor.run()
-
-            print(f"\n{year}年年报处理完毕\n")
-    else:
-        # 处理单独年份
-        config = ConverterConfig(
-            excel_file=EXCEL_FILE,
-            pdf_dir=f'年报文件/{SINGLE_YEAR}/pdf年报',
-            txt_dir=f'年报文件/{SINGLE_YEAR}/txt年报',
-            target_year=SINGLE_YEAR,
-            delete_pdf=DELETE_PDF,
-            max_retries=MAX_RETRIES,
-            timeout=TIMEOUT,
-            processes=PROCESSES
-        )
-
-        processor = AnnualReportProcessor(config)
-        processor.run()
-
-        print(f"\n{SINGLE_YEAR}年年报处理完毕\n")
+    args = parse_args()
+    code = str(args.code).zfill(6)
+    config = ConverterConfig(
+        excel_file=args.excel_file,
+        pdf_dir=str(Path(args.out) / code / str(args.year) / 'pdf'),
+        txt_dir=str(Path(args.out) / code / str(args.year)),
+        target_year=args.year,
+        delete_pdf=not args.keep_pdf,
+        max_retries=args.max_retries,
+        timeout=args.timeout,
+        processes=1,
+        target_code=code,
+    )
+    success = AnnualReportProcessor(config).run()
+    raise SystemExit(0 if success else 1)

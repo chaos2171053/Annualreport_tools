@@ -79,6 +79,49 @@
 pip install -r requirements.txt
 ```
 
+
+## GitHub Actions worker
+
+This fork runs the existing `2.pdf_batch_converter.py` in GitHub Actions, so a local machine does not need to download or parse PDFs.
+
+Manual trigger from GitHub UI:
+
+- Workflow: `annual-report`
+- Inputs:
+  - `excel_file`: Excel file in this repo with `公司代码`, `公司简称`, `年份`, `年报链接`
+  - `code`: stock code, for example `600519`
+  - `year`: report year, for example `2023`
+  - `keep_pdf`: defaults to `false`; TXT artifacts are enough for downstream analysis
+
+Trigger with GitHub CLI:
+
+```bash
+gh workflow run annual-report.yml \
+  -f excel_file=path/to/AnnualReport_links.xlsx \
+  -f code=600519 \
+  -f year=2023
+```
+
+Download the latest artifact to a local cache:
+
+```bash
+run_id=$(gh run list --workflow annual-report.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch "$run_id"
+mkdir -p data-cache
+gh run download "$run_id" -D data-cache
+```
+
+Expected output:
+
+```text
+data-cache/
+  600519/
+    2023/
+      600519_<company>_2023.txt
+```
+
+Artifacts use the repository default retention. Long-term local data should live in the gitignored `data-cache/` directory.
+
 ## 多语言文档
 
 - [docs/README.en.md](./docs/README.en.md) — English（完整版本）
