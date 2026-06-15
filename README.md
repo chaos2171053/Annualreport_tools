@@ -102,6 +102,14 @@ export ANNUAL_REPORT_CACHE_DIR=data-cache
 scripts/fetch-report.sh 600519 2023
 ```
 
+If you already have the official PDF URL, you can skip the Excel link table:
+
+```bash
+ANNUAL_REPORT_URL=https://static.cninfo.com.cn/finalpage/YYYY-MM-DD/example.PDF \
+ANNUAL_REPORT_COMPANY_NAME=Company \
+scripts/fetch-report.sh 600519 2023
+```
+
 Expected output:
 
 ```text
@@ -120,7 +128,9 @@ Manual trigger from GitHub UI:
 
 - Workflow: `annual-report`
 - Inputs:
-  - `excel_file`: Excel file in this repo with `公司代码`, `公司简称`, `年份`, `年报链接`
+  - `excel_file`: Excel file in this repo with `公司代码`, `公司简称`, `年份`, `年报链接`; optional when `report_url` is provided
+  - `report_url`: direct annual report PDF URL; optional when `excel_file` is provided
+  - `company_name`: company short name used with `report_url` output naming
   - `code`: stock code, for example `600519`
   - `year`: report year, for example `2023`
   - `keep_pdf`: defaults to `false`; TXT artifacts are enough for downstream analysis

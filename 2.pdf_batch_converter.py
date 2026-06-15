@@ -56,7 +56,7 @@ logging.basicConfig(
 @dataclass(frozen=True)
 class ConverterConfig:
     """PDF批量下载转换配置类。"""
-    excel_file: str  # Excel表格路径
+    excel_file: Optional[str]  # Excel表格路径
     pdf_dir: str  # PDF存储目录
     txt_dir: str  # TXT存储目录
     target_year: int  # 目标年份
@@ -66,6 +66,8 @@ class ConverterConfig:
     chunk_size: int = 8192  # 下载块大小
     processes: Optional[int] = None  # 进程数，None表示自动
     target_code: Optional[str] = None  # 只处理指定股票代码，None表示处理全年全部记录
+    direct_report_url: Optional[str] = None  # 直接处理单个PDF链接
+    direct_company_name: Optional[str] = None  # 直接PDF链接对应的公司简称
 
 
 class PDFDownloader:
@@ -375,6 +377,9 @@ class AnnualReportProcessor:
 
     def _load_excel_data(self) -> Optional[pd.DataFrame]:
         """加载Excel数据。"""
+        if not self.config.excel_file:
+            logging.error("未提供Excel文件路径")
+            return None
         try:
             df = pd.read_excel(self.config.excel_file)
             logging.info(f"成功加载Excel文件: {self.config.excel_file}")
@@ -385,6 +390,22 @@ class AnnualReportProcessor:
         except Exception as e:
             logging.error(f"读取Excel失败: {e}")
             return None
+
+    def _load_direct_data(self) -> Optional[pd.DataFrame]:
+        """从单个PDF链接构造输入数据。"""
+        if not self.config.direct_report_url:
+            return None
+        code = str(self.config.target_code or "").zfill(6)
+        name = self.config.direct_company_name or code
+        logging.info(f"使用直接PDF链接: {code} {self.config.target_year} {name}")
+        return pd.DataFrame([
+            {
+                '公司代码': code,
+                '公司简称': name,
+                '年份': self.config.target_year,
+                '年报链接': self.config.direct_report_url,
+            }
+        ])
 
     def _prepare_directories(self) -> bool:
         """创建必要的目录。"""
@@ -426,7 +447,9 @@ class AnnualReportProcessor:
         logging.info("="*60)
 
         # 加载数据
-        df = self._load_excel_data()
+        df = self._load_direct_data()
+        if df is None:
+            df = self._load_excel_data()
         if df is None:
             return False
 
@@ -463,15 +486,20 @@ class AnnualReportProcessor:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Download one annual report from an existing link Excel and convert it to TXT.")
-    parser.add_argument("--excel-file", required=True, help="Excel file with columns: 公司代码, 公司简称, 年份, 年报链接")
+    parser = argparse.ArgumentParser(description="Download one annual report PDF and convert it to TXT.")
+    parser.add_argument("--excel-file", help="Excel file with columns: 公司代码, 公司简称, 年份, 年报链接")
+    parser.add_argument("--report-url", help="Direct annual report PDF URL from an allowed host")
+    parser.add_argument("--company-name", help="Company short name for direct --report-url output naming")
     parser.add_argument("--code", required=True, help="Stock code, for example 600519")
     parser.add_argument("--year", required=True, type=int, help="Report year, for example 2023")
     parser.add_argument("--out", default="out", help="Output root directory")
     parser.add_argument("--keep-pdf", action="store_true", help="Keep downloaded PDF next to output TXT")
     parser.add_argument("--timeout", type=int, default=15, help="Download timeout seconds")
     parser.add_argument("--max-retries", type=int, default=3, help="Download retry count")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.excel_file and not args.report_url:
+        parser.error("one of --excel-file or --report-url is required")
+    return args
 
 
 if __name__ == '__main__':
@@ -487,6 +515,8 @@ if __name__ == '__main__':
         timeout=args.timeout,
         processes=1,
         target_code=code,
+        direct_report_url=args.report_url,
+        direct_company_name=args.company_name,
     )
     success = AnnualReportProcessor(config).run()
     raise SystemExit(0 if success else 1)

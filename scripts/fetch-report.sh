@@ -12,6 +12,8 @@ Environment:
   ANNUAL_REPORT_CACHE_DIR     Local TXT cache directory. Defaults to data-cache.
   ANNUAL_REPORT_WORKFLOW      Workflow file name. Defaults to annual-report.yml.
   ANNUAL_REPORT_KEEP_PDF      Pass true to keep PDF artifacts. Defaults to false.
+  ANNUAL_REPORT_URL           Direct annual report PDF URL. Skips the Excel file.
+  ANNUAL_REPORT_COMPANY_NAME  Company short name used with ANNUAL_REPORT_URL.
 
 Output:
   Prints TXT_READY lines for cached or downloaded TXT files.
@@ -34,6 +36,8 @@ excel_file="${3:-${ANNUAL_REPORT_LINKS_XLSX:-data/annual-report-links.xlsx}}"
 workflow="${ANNUAL_REPORT_WORKFLOW:-annual-report.yml}"
 cache_dir="${ANNUAL_REPORT_CACHE_DIR:-data-cache}"
 keep_pdf="${ANNUAL_REPORT_KEEP_PDF:-false}"
+report_url="${ANNUAL_REPORT_URL:-}"
+company_name="${ANNUAL_REPORT_COMPANY_NAME:-}"
 
 if [ -z "$code" ] || [ "${#code}" -gt 6 ]; then
   echo "ERROR: stock_code must be 1 to 6 digits: $1" >&2
@@ -77,20 +81,31 @@ if [ -n "$existing_txt" ]; then
   exit 0
 fi
 
-if [ ! -f "$excel_file" ]; then
+if [ -z "$report_url" ] && [ ! -f "$excel_file" ]; then
   echo "ERROR: Excel file not found: $excel_file" >&2
+  echo "Set ANNUAL_REPORT_URL to use a direct PDF URL instead." >&2
   exit 1
 fi
 
 branch="$(git rev-parse --abbrev-ref HEAD)"
 started_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
-gh workflow run "$workflow" \
-  --ref "$branch" \
-  -f "excel_file=$excel_file" \
-  -f "code=$code" \
-  -f "year=$year" \
+workflow_args=(
+  --ref "$branch"
+  -f "code=$code"
+  -f "year=$year"
   -f "keep_pdf=$keep_pdf"
+)
+if [ -n "$report_url" ]; then
+  workflow_args+=(-f "report_url=$report_url")
+  if [ -n "$company_name" ]; then
+    workflow_args+=(-f "company_name=$company_name")
+  fi
+else
+  workflow_args+=(-f "excel_file=$excel_file")
+fi
+
+gh workflow run "$workflow" "${workflow_args[@]}"
 
 run_id=""
 for _ in $(seq 1 30); do
