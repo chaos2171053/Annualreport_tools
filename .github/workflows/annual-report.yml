@@ -4,8 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       excel_file:
-        description: Path to Excel file with annual report links
-        required: true
+        description: Path to Excel file with annual report links. Optional when report_url is provided.
+        required: false
+        default: ""
+      report_url:
+        description: Direct annual report PDF URL. Optional when excel_file is provided.
+        required: false
+        default: ""
+      company_name:
+        description: Company short name for direct report_url output naming
+        required: false
+        default: ""
       code:
         description: Stock code, for example 600519
         required: true
@@ -36,16 +45,26 @@ jobs:
           pip install -r requirements.txt
       - name: Fetch and convert annual report
         run: |
-          keep_pdf_flag=""
+          args=(
+            --code "${{ inputs.code }}"
+            --year "${{ inputs.year }}"
+            --out out
+          )
           if [ "${{ inputs.keep_pdf }}" = "true" ]; then
-            keep_pdf_flag="--keep-pdf"
+            args+=(--keep-pdf)
           fi
-          python "2.pdf_batch_converter.py" \
-            --excel-file "${{ inputs.excel_file }}" \
-            --code "${{ inputs.code }}" \
-            --year "${{ inputs.year }}" \
-            --out out \
-            $keep_pdf_flag
+          if [ -n "${{ inputs.report_url }}" ]; then
+            args+=(--report-url "${{ inputs.report_url }}")
+            if [ -n "${{ inputs.company_name }}" ]; then
+              args+=(--company-name "${{ inputs.company_name }}")
+            fi
+          elif [ -n "${{ inputs.excel_file }}" ]; then
+            args+=(--excel-file "${{ inputs.excel_file }}")
+          else
+            echo "Either excel_file or report_url is required" >&2
+            exit 2
+          fi
+          python "2.pdf_batch_converter.py" "${args[@]}"
       - name: Upload TXT artifact
         uses: actions/upload-artifact@v4
         with:
