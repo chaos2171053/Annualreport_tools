@@ -84,6 +84,38 @@ pip install -r requirements.txt
 
 This fork runs the existing `2.pdf_batch_converter.py` in GitHub Actions, so a local machine does not need to download or parse PDFs.
 
+### One-command fetch
+
+Use the helper script from a cloned repository:
+
+```bash
+scripts/fetch-report.sh 600519 2023 data/annual-report-links.xlsx
+```
+
+If the TXT is already cached, the script returns the existing path and does not start a new workflow run.
+
+Default paths can be configured with environment variables:
+
+```bash
+export ANNUAL_REPORT_LINKS_XLSX=data/annual-report-links.xlsx
+export ANNUAL_REPORT_CACHE_DIR=data-cache
+scripts/fetch-report.sh 600519 2023
+```
+
+Expected output:
+
+```text
+TXT_READY /path/to/Annualreport_tools/data-cache/600519/2023/600519_<company>_2023.txt
+```
+
+The local cache is intentionally gitignored:
+
+```text
+data-cache/<stock_code>/<year>/*.txt
+```
+
+### Manual workflow
+
 Manual trigger from GitHub UI:
 
 - Workflow: `annual-report`

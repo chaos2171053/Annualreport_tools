@@ -46,6 +46,6 @@ data/
 # Private paid scripts (do not open source)
 batch_mda_extract.py
 
-# Worker outputs downloaded by Hermes/OKK on Pi
+# Worker outputs downloaded from GitHub Actions
 out/
 data-cache/
