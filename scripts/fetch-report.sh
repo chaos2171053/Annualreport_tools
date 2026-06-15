@@ -68,11 +68,6 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 127
 fi
 
-if [ ! -f "$excel_file" ]; then
-  echo "ERROR: Excel file not found: $excel_file" >&2
-  exit 1
-fi
-
 target_dir="$cache_dir/$code/$year"
 existing_txt="$(find "$target_dir" -maxdepth 1 -type f -iname '*.txt' -print -quit 2>/dev/null || true)"
 if [ -n "$existing_txt" ]; then
@@ -80,6 +75,11 @@ if [ -n "$existing_txt" ]; then
     printf 'TXT_READY %s\n' "$repo_root/$path"
   done
   exit 0
+fi
+
+if [ ! -f "$excel_file" ]; then
+  echo "ERROR: Excel file not found: $excel_file" >&2
+  exit 1
 fi
 
 branch="$(git rev-parse --abbrev-ref HEAD)"
