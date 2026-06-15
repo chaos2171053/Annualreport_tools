@@ -67,18 +67,25 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(git -C "$script_dir/.." rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$script_dir/..")"
 cd "$repo_root"
 
-if ! command -v gh >/dev/null 2>&1; then
-  echo "ERROR: gh is required and must be authenticated for this repository" >&2
-  exit 127
-fi
+print_txt_ready() {
+  case "$1" in
+    /*) printf 'TXT_READY %s\n' "$1" ;;
+    *) printf 'TXT_READY %s\n' "$repo_root/$1" ;;
+  esac
+}
 
 target_dir="$cache_dir/$code/$year"
 existing_txt="$(find "$target_dir" -maxdepth 1 -type f -iname '*.txt' -print -quit 2>/dev/null || true)"
 if [ -n "$existing_txt" ]; then
   find "$target_dir" -maxdepth 1 -type f -iname '*.txt' -print | sort | while IFS= read -r path; do
-    printf 'TXT_READY %s\n' "$repo_root/$path"
+    print_txt_ready "$path"
   done
   exit 0
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "ERROR: gh is required and must be authenticated for this repository" >&2
+  exit 127
 fi
 
 if [ -z "$report_url" ] && [ ! -f "$excel_file" ]; then
@@ -148,5 +155,5 @@ if ! find "$target_dir" -maxdepth 1 -type f -iname '*.txt' -print -quit | grep -
 fi
 
 find "$target_dir" -maxdepth 1 -type f -iname '*.txt' -print | sort | while IFS= read -r path; do
-  printf 'TXT_READY %s\n' "$repo_root/$path"
+  print_txt_ready "$path"
 done
