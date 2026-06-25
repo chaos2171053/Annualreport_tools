@@ -73,7 +73,7 @@ class ConverterConfig:
 class PDFDownloader:
     """PDF下载器类。"""
 
-    ALLOWED_HOSTS = {"static.cninfo.com.cn", "www.cninfo.com.cn"}
+    ALLOWED_HOSTS = {"static.cninfo.com.cn", "www.cninfo.com.cn", "pdf.dfcfw.com"}
 
     HEADERS = {
         "Accept-Encoding": "gzip, deflate, br",
