@@ -29,6 +29,10 @@ on:
         options:
           - "false"
           - "true"
+      period:
+        description: Report period (annual / semi / q1 / q3)
+        required: false
+        default: "annual"
 
 jobs:
   fetch:
@@ -63,6 +67,9 @@ jobs:
           else
             echo "Either excel_file or report_url is required" >&2
             exit 2
+          fi
+          if [ "${{ inputs.period }}" != "annual" ]; then
+            args+=(--period "${{ inputs.period }}")
           fi
           python "2.pdf_batch_converter.py" "${args[@]}"
       - name: Upload TXT artifact
