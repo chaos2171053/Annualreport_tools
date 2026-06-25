@@ -68,6 +68,7 @@ class ConverterConfig:
     target_code: Optional[str] = None  # 只处理指定股票代码，None表示处理全年全部记录
     direct_report_url: Optional[str] = None  # 直接处理单个PDF链接
     direct_company_name: Optional[str] = None  # 直接PDF链接对应的公司简称
+    period: str = "annual"  # 报告期：annual / semi / q1 / q3
 
 
 class PDFDownloader:
@@ -328,6 +329,8 @@ class PDFConverter:
         """
         # 生成文件名
         base_name = self._sanitize_filename(f"{code:06}_{name}_{year}")
+        if self.config.period != "annual":
+            base_name += f"_{self.config.period}"
         pdf_file_path = os.path.join(self.config.pdf_dir, f"{base_name}.pdf")
         txt_file_path = os.path.join(self.config.txt_dir, f"{base_name}.txt")
 
@@ -510,6 +513,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keep-pdf", action="store_true", help="Keep downloaded PDF next to output TXT")
     parser.add_argument("--timeout", type=int, default=15, help="Download timeout seconds")
     parser.add_argument("--max-retries", type=int, default=3, help="Download retry count")
+    parser.add_argument("--period", default="annual", choices=["annual", "semi", "q1", "q3"],
+                        help="Report period: annual (default), semi (半年报), q1 (一季报), q3 (三季报)")
     args = parser.parse_args()
     if not args.excel_file and not args.report_url:
         parser.error("one of --excel-file or --report-url is required")
@@ -531,6 +536,7 @@ if __name__ == '__main__':
         target_code=code,
         direct_report_url=args.report_url,
         direct_company_name=args.company_name,
+        period=args.period,
     )
     success = AnnualReportProcessor(config).run()
     raise SystemExit(0 if success else 1)

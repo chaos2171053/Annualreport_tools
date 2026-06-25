@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/fetch-report.sh <stock_code> <year> [excel_file]
+  scripts/fetch-report.sh <stock_code> <year> [excel_file] [period]
 
 Environment:
   ANNUAL_REPORT_LINKS_XLSX    Default Excel path when [excel_file] is omitted.
@@ -14,6 +14,7 @@ Environment:
   ANNUAL_REPORT_KEEP_PDF      Pass true to keep PDF artifacts. Defaults to false.
   ANNUAL_REPORT_URL           Direct annual report PDF URL. Skips the Excel file.
   ANNUAL_REPORT_COMPANY_NAME  Company short name used with ANNUAL_REPORT_URL.
+  ANNUAL_REPORT_PERIOD        Report period: annual (default), semi, q1, q3.
 
 Output:
   Prints TXT_READY lines for cached or downloaded TXT files.
@@ -38,6 +39,7 @@ cache_dir="${ANNUAL_REPORT_CACHE_DIR:-data-cache}"
 keep_pdf="${ANNUAL_REPORT_KEEP_PDF:-false}"
 report_url="${ANNUAL_REPORT_URL:-}"
 company_name="${ANNUAL_REPORT_COMPANY_NAME:-}"
+period="${ANNUAL_REPORT_PERIOD:-annual}"
 
 if [ -z "$code" ] || [ "${#code}" -gt 6 ]; then
   echo "ERROR: stock_code must be 1 to 6 digits: $1" >&2
@@ -102,6 +104,7 @@ workflow_args=(
   -f "code=$code"
   -f "year=$year"
   -f "keep_pdf=$keep_pdf"
+  -f "period=$period"
 )
 if [ -n "$report_url" ]; then
   workflow_args+=(-f "report_url=$report_url")
